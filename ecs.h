@@ -60,7 +60,7 @@ namespace mirage::ecs
 
 		void callLate(void (T::*func)(void));	
 
-		void callLate(boost::function<void(void)> function);
+		void callLate(const boost::function<void(void)>& function);
 
 		/*
 		 * cannot be called in event handler 
@@ -117,6 +117,11 @@ namespace mirage::ecs
 	{
 		// Creates instance on first call. Can cause late-initialization 
 		static T& getInstance(void);
+
+		struct Lockable
+		{
+			static std::mutex mutex;
+		};
 	};
 
 	template<typename T>	
@@ -377,7 +382,7 @@ mirage::ecs::Component<T>::operator const entt::entity&(void) const
 }
 
 template<typename T>
-void mirage::ecs::Component<T>::callLate(boost::function<void(void)> function)
+void mirage::ecs::Component<T>::callLate(const boost::function<void(void)>& function)
 {
 	std::lock_guard lock(lateQueueLock());
 	lateQueue().push_back(std::move(function));
@@ -399,3 +404,6 @@ T& mirage::ecs::Singleton<T>::getInstance(void)
 
 	return cw.get();
 }
+
+template<typename T>
+inline std::mutex mirage::ecs::Singleton<T>::Lockable::mutex;

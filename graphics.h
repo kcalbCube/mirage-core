@@ -22,11 +22,13 @@ namespace mirage::graphics
 	{
 		SDL_Surface* surface{nullptr};
 		float scale = 1.f;
+		Icon id;
 
 		void save(auto& ar, const unsigned)
 		{
 			ar & SurfaceWrapper{surface};
 			ar & scale;
+			ar & id;
 		}
 
 		void load(auto& ar, const unsigned version)
@@ -35,7 +37,10 @@ namespace mirage::graphics
 			ar & sw;
 			surface = sw.surface;
 			ar & scale;
+			ar & id;
 		}
+
+		BOOST_SERIALIZATION_SPLIT_MEMBER()
 	};
 	
 	using Transform = utils::Vec3<float>;
@@ -94,7 +99,6 @@ BOOST_CLASS_VERSION(mirage::graphics::Vertice, 1);
 BOOST_CLASS_VERSION(mirage::graphics::VerticeGroup, 1);
 
 BOOST_SERIALIZATION_SPLIT_FREE(mirage::graphics::SurfaceWrapper);
-BOOST_SERIALIZATION_SPLIT_FREE(mirage::graphics::IconResource);
 
 namespace boost::serialization
 {

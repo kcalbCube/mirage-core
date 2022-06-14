@@ -51,11 +51,13 @@ namespace mirage::network
 	};
 
 	template<typename T>
-	inline const T& packetCast(const AbstractPacket& packet)
+	inline const T packetCast(const AbstractPacket& packet)
 	{
 		if(!packet.packet)
 			; // FIXME:
-		return *reinterpret_cast<const T*>(packet.packet);
+		T npacket;
+		memcpy(static_cast<void*>(&npacket), static_cast<const void*>(packet.packet), sizeof(T));
+		return npacket;
 	}
 }
 

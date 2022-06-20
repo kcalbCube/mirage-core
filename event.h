@@ -28,7 +28,7 @@ namespace mirage::event
 	MIRAGE_COFU(std::mutex, lock);
 
 	template<typename T, typename... Args>
-	inline void enqueueEvent(Args&&... args)
+	inline void enqueueEvent(Args... args)
 	{	
 		dispatcher().enqueue<T>(args...);	
 	}

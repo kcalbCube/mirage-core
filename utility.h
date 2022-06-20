@@ -1,5 +1,4 @@
 #pragma once
-#include "boost/archive/text_oarchive.hpp"
 #include <sstream>
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <boost/bind.hpp>
@@ -10,8 +9,8 @@
 #include <magic_enum.hpp>
 #include "logging.h"
 #include <boost/uuid/uuid.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/uuid/uuid_serialize.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -70,10 +69,12 @@ namespace mirage::utils
 		return std::string_view(src, size);
 	}
 
+	constexpr auto serializationFlags = boost::archive::no_header | boost::archive::no_tracking;
+
 	inline std::string serialize(const auto& value)
 	{
 		std::stringstream ss{};
-		boost::archive::text_oarchive archive{ss};
+		boost::archive::binary_oarchive archive{ss, serializationFlags};
 		
 		archive << value;
 
@@ -85,7 +86,7 @@ namespace mirage::utils
 	{
 		std::istringstream ss{sv};	
 
-		boost::archive::text_iarchive archive{ss};
+		boost::archive::binary_iarchive archive{ss, serializationFlags};
 		
 		T value;
 

@@ -9,6 +9,7 @@ namespace mirage::network
 {
 	constexpr uint32_t packetConstant = 0x4752494D;
 	constexpr size_t maxPacketSize = 1024;
+	constexpr size_t maxTcpPacketSize = 307'200;
 	constexpr size_t usernameMax = 32;
 
 	enum class PacketId : uint8_t
@@ -108,7 +109,7 @@ namespace mirage::network
 	struct ResourceUpdate : Packet<PacketId::resource>
 	{	
 		using SerializedT = std::vector<graphics::IconResource>;
-		char serialized[256];
+		char serialized[300'000];
 	};
 
 	struct ResourceRequest : Packet<PacketId::resource>

@@ -5,6 +5,7 @@
 #include <boost/serialization/version.hpp>
 #include "boost/optional/optional.hpp"
 #include "boost/variant/variant.hpp"
+#include "libs/asio/include/boost/asio/buffer.hpp"
 #include "utility.h"
 #include <entt/entt.hpp>
 #include <SDL.h>
@@ -24,7 +25,7 @@ namespace mirage::graphics
 		float scale = 1.f;
 		Icon id;
 
-		void save(auto& ar, const unsigned)
+		void save(auto& ar, const unsigned) const
 		{
 			ar & SurfaceWrapper{surface};
 			ar & scale;
@@ -107,7 +108,7 @@ namespace boost::serialization
 		auto* const& surface = surfacew.surface;
 		ar & surface->w;
 		ar & surface->h;
-		ar & surface->pitch;
+		ar & surface->pitch;	
 		ar & serialization::make_array(static_cast<char*>(surface->pixels), surface->h * surface->pitch);
 	}
 	

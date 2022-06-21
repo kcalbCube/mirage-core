@@ -12,7 +12,8 @@ template<> struct fmt::formatter<mirage::network::PacketId>
 
 namespace mirage::network
 {
-	inline boost::asio::ip::udp::endpoint fromString(const std::string& sv, int port)
+	template<typename T>
+	inline T fromString(const std::string& sv, unsigned short port)
 	{
 		boost::system::error_code ec;
 		boost::asio::ip::address address = 
@@ -23,8 +24,17 @@ namespace mirage::network
 			abort();
 		}
 
-		return boost::asio::ip::udp::endpoint(address, port);
+		return T{address, port};
+	}
 
+	inline auto fromStringUdp(const std::string& sv, unsigned short port)
+	{
+		return fromString<boost::asio::ip::udp::endpoint>(sv, port);
+	}
+
+	inline auto fromStringTcp(const std::string& sv, unsigned short port)
+	{
+		return fromString<boost::asio::ip::tcp::endpoint>(sv, port);
 	}
 
 	// a view to a packet

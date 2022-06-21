@@ -3,6 +3,7 @@
 #include <string>
 #include <boost/uuid/uuid.hpp>
 #include <boost/serialization/version.hpp>
+#include "SDL_surface.h"
 #include "boost/optional/optional.hpp"
 #include "boost/variant/variant.hpp"
 #include "libs/asio/include/boost/asio/buffer.hpp"
@@ -108,6 +109,8 @@ namespace boost::serialization
 		auto* const& surface = surfacew.surface;
 		ar & surface->w;
 		ar & surface->h;
+		ar & surface->format->BitsPerPixel;
+		ar & surface->format->format;
 		ar & surface->pitch;	
 		ar & serialization::make_array(static_cast<char*>(surface->pixels), surface->h * surface->pitch);
 	}
@@ -122,17 +125,15 @@ namespace boost::serialization
 		ar & w;
 		ar & h;
 
+		uint8_t depth;
+		ar & depth;
+
+		uint32_t format;
+		ar & format;
+
 		bool shouldInitialize = !surface;
 		if(shouldInitialize)
-			surface = SDL_CreateRGBSurface(
-				0, 
-				w, 
-				h, 
-				32, 
-				0, 
-				0, 
-				0, 
-				0);
+			surface = SDL_CreateRGBSurfaceWithFormat(0, w, h, depth, format);	
 		else
 			SDL_LockSurface(surface);
 

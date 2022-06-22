@@ -134,7 +134,7 @@ namespace mirage::ecs::processing
 						catch(Process::Exit) {}
 						catch(std::exception& exception)
 						{
-							process->fail();
+							process->terminate();
 							loge("Exception in process \"{}\": {}, process terminated", // TODO: boost::stacktrace
 								boost::core::demangle(typeid(*process).name()),
 								exception.what());

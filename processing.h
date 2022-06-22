@@ -1,24 +1,179 @@
 #pragma once
+#include <ctime>
 #include <thread>
 #include <chrono>
 #include "ecs.h"
 #include <iostream>
+#include "utility.h"
+#include <map>
+#include <boost/core/demangle.hpp>
+
 namespace mirage::ecs::processing
 {
-	template<typename DeltaType_>
+	struct Process
+	{	
+		enum class State
+		{
+			running,
+			paused,
+			failed,
+			terminated,
+			succeeded
+		} state = State::running;
+		clock_t last = 0;
+		int priority = 0; // less - earlier
+
+		struct Exit {};
+
+		void fail(void)
+		{
+			state = State::failed;
+			throw Exit{};
+		}
+
+		void pause(void)
+		{
+			state = State::paused;
+			throw Exit{};
+		}
+
+		void unpause(void)
+		{
+			state = State::running;
+		}
+
+		void succeed(void)
+		{
+			state = State::succeeded;
+			throw Exit{};
+		}
+	
+		void terminate(void) noexcept
+		{
+			state = State::terminated;
+		}
+
+		// Not virtual, CRTP.
+		void initialize(void) {}
+
+		virtual void onFail(void)    {}	
+		virtual void onSucceed(void) {}
+		virtual void update(float delta) = 0;
+
+		virtual ~Process(void) {}
+
+		friend bool operator<(Process& l, Process& r) { return l.priority < r.priority; }
+	};
+
 	class Processor
 	{
-	public:	
-		using DeltaType = DeltaType_;	
-		entt::scheduler<DeltaType_> scheduler;	
-		
-		virtual ~Processor(void);
+		std::map<entt::id_type, std::unique_ptr<Process>> processes;
+		std::mutex mutex;
+
+		entt::id_type i = 0;
+	public:
+
+		/*
+		 * @returns descriptor of the attached process
+		 */
+		template<typename ProcessT, typename... Args>
+		entt::id_type attach(Args&&... args)
+		{
+			std::lock_guard guard{mutex};
+
+			auto& process = *processes.emplace(i, std::make_unique<ProcessT>()).first->second;
+			static_cast<ProcessT&>(process).initialize(args...);
+
+			return i++;
+		}
+
+		// terminate a process, will not stop already updating process, then wait a tick.
+		void terminate(entt::id_type id)
+		{
+			std::lock_guard guard{mutex};
+
+			if(!processes.contains(id))
+				return;
+
+			processes[id]->terminate();
+		}
+
+		void update(void)
+		{
+			if(processes.empty())
+				return;
+
+			std::lock_guard guard{mutex};
+
+			std::erase_if(processes,
+				[&](auto& pair) -> bool
+				{
+					auto& process = pair.second;
+
+					switch(process->state)
+					{
+					case Process::State::running:
+						try
+						{
+							clock_t now = clock();
+							float passed;
+
+							if(now < process->last) // clock_t overflow
+							{
+								if constexpr (sizeof(clock_t) == 4)
+									passed = static_cast<float>(static_cast<uint64_t>(UINT32_MAX) + now) / (CLOCKS_PER_SEC * 1000.f);
+								else
+									passed = now / (CLOCKS_PER_SEC * 1000.f);
+							}
+							else [[likely]]
+								passed = static_cast<float>(now - process->last) / (CLOCKS_PER_SEC * 1000.f);	
+
+							process->update(passed);
+							process->last = now;
+						}
+						catch(Process::Exit) {}
+						catch(std::exception& exception)
+						{
+							process->fail();
+							loge("Exception in process \"{}\": {}, process terminated", // TODO: boost::stacktrace
+								boost::core::demangle(typeid(*process).name()),
+								exception.what());
+						}
+						break;
+
+					case Process::State::succeeded:
+						process->onSucceed();
+						return true;
+
+					case Process::State::failed:
+						process->onFail();
+						return true;
+
+					case Process::State::terminated:
+						return true;
+
+					case Process::State::paused:	
+					default:
+						break;	
+					}
+
+					return false;
+				});
+		}
+
+		virtual void start(void) = 0;
+		virtual void stop(void) = 0;
+
+		virtual ~Processor(void) {}
 	};
 
 	template<unsigned Milliseconds>
-	class PeriodMS : public Processor<unsigned>
+	class PeriodMS : public Processor
 	{
-		PeriodMS(void) { start(); }
+		PeriodMS(void)
+		{
+			start();
+		}
 		std::jthread thread;
 	public:
 
@@ -31,10 +186,7 @@ namespace mirage::ecs::processing
 			static PeriodMS<Milliseconds> instance;
 			return instance;
 		}
-	};
-
-	template<unsigned Delim=100>
-	void doAfter(unsigned milliseconds, std::function<void(void)> function);
+	};	
 
 	class EventDispatcherProcessing : public ecs::Component<EventDispatcherProcessing>
 	{
@@ -56,13 +208,31 @@ namespace mirage::ecs
 	template<typename T>
 	struct Processing
 	{
-		template<typename Derived, typename DeltaType>
-		using Process = entt::process<Derived, DeltaType>;	
+		template<typename Derived>
+		struct Process : processing::Process
+		{
+			ComponentWrapper<T> parent;
+			
+			void initialize(entt::entity parent_)
+			{
+				parent = parent_;
+			}
+		};
 
-		template<typename ProcessT, typename DeltaType, typename... Args>
-		void startProcess(processing::Processor<DeltaType>& processor, Args&&... args)
+		template<typename ProcessT, typename... Args>
+			requires (!std::derived_from<ProcessT, Process<ProcessT>>)
+		void startProcess(processing::Processor& processor, Args&&... args)
 		{	
-			processor.scheduler.template attach<ProcessT>(args...);
+			processor.template attach<ProcessT>(args...);
+		}
+
+		template<typename ProcessT, typename... Args>
+			requires std::derived_from<ProcessT, Process<ProcessT>>
+		void startProcess(processing::Processor& processor, Args&&... args)
+		{
+			processor.template attach<ProcessT>(
+				static_cast<T*>(this)->entity, args...);
+
 		}
 	};
 }
@@ -89,53 +259,6 @@ inline void mirage::ecs::processing::EventDispatcherProcessing::onDestroy()
 	stopped.wait(false);
 }
 
-template<unsigned Delim>
-inline void mirage::ecs::processing::doAfter(
-	unsigned milliseconds, 
-	std::function<void(void)> function)
-{
-	if(milliseconds < Delim)
-	{
-		if(Delim <= 1)
-		{
-			abort();
-		}
-
-		doAfter<Delim / 10>(milliseconds, function);
-		return;
-	}
-
-	class Process : public entt::process<Process, unsigned>
-	{
-		std::function<void(void)> function;
-		unsigned forSucceed = 0, counter = 0;
-	public:
-		Process(std::function<void(void)> function_, unsigned forSucceed_)
-			: function { std::move(function_) },
-			forSucceed { forSucceed_ } {}
-
-		void update(unsigned delta, void*)
-		{
-			if(counter++ > forSucceed)
-				entt::process<Process, unsigned>::succeed();
-		}
-
-		void succeeded(void)
-		{
-			function();
-		}
-	};
-
-	PeriodMS<Delim>::getInstance().scheduler
-		.template attach<Process>(function, milliseconds / Delim);
-}
-
-template<typename DeltaType_>
-inline mirage::ecs::processing::Processor<DeltaType_>::~Processor(void) 
-{
-	scheduler.clear();
-}
-
 template<unsigned Milliseconds>
 inline void mirage::ecs::processing::PeriodMS<Milliseconds>::start(void)
 {
@@ -144,7 +267,7 @@ inline void mirage::ecs::processing::PeriodMS<Milliseconds>::start(void)
 		while(!itoken.stop_requested())
 		{
 			auto start = std::chrono::high_resolution_clock::now();
-			scheduler.update(Milliseconds);
+			update();
 			std::this_thread::sleep_until(start +
 				std::chrono::milliseconds(Milliseconds));
 		};

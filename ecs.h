@@ -247,6 +247,8 @@ inline const T* mirage::ecs::ComponentWrapper<T>::tryGet(void) const
 template<typename T>
 inline T& mirage::ecs::ComponentWrapper<T>::get(void)
 {
+	if(!isValid())
+		throw std::runtime_error("attempt of dereference invalid ComponenWrapper<T> via get()");
 	return registry().get<T>(entity);
 }
 template<typename T>

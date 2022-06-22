@@ -111,3 +111,11 @@ namespace mirage::utils
 		};
 	};
 }
+template<typename T> 
+struct std::less<std::unique_ptr<T>> 
+{
+	bool operator()(const std::unique_ptr<T>& a, const std::unique_ptr<T>& b) const 
+	{
+		return *a < *b;
+	}
+};

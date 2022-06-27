@@ -1,7 +1,5 @@
 #pragma once
 #include <string>
-#include <boost/uuid/uuid.hpp>
-#include "utility.h"
 #include "graphics.h"
 #include <boost/asio/ip/udp.hpp>
 
@@ -42,7 +40,11 @@ namespace mirage::network
 		 * s->c ResourceUpdate
 		 * c->s ResourceRequest
 		 */
-		resource
+		resource,
+		/*
+		 * c->s Input
+		 */
+		input
 	};
 
 #pragma pack(push, 1)
@@ -86,12 +88,7 @@ namespace mirage::network
 	struct MessageSent : Packet<PacketId::message>
 	{
 		static constexpr size_t messageMax = 128;
-		char message[messageMax]{};
-
-		std::string_view view(void) const
-		{
-			return utils::stringView(message, messageMax);
-		}
+		char message[messageMax]{};	
 	};
 
 	struct ServerInfo : Packet<PacketId::serverInfo>
@@ -115,6 +112,12 @@ namespace mirage::network
 	struct ResourceRequest : Packet<PacketId::resource>
 	{
 		using SerializedT = std::vector<graphics::Icon>;
+		char serialized[256];
+	};
+
+	struct Input : Packet<PacketId::input>
+	{
+		using SerializedT = std::set<SDL_Scancode>;
 		char serialized[256];
 	};
 

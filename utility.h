@@ -6,94 +6,35 @@
 #include <string>
 #include <boost/range/algorithm_ext/erase.hpp>
 #include "static.h"
-#include <magic_enum.hpp>
 #include "logging.h"
-#include <boost/uuid/uuid.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
-#include <boost/uuid/uuid_serialize.hpp>
-#include <boost/uuid/uuid_io.hpp>
+#include <boost/serialization/set.hpp>
 #include <boost/serialization/optional.hpp>
 #include <boost/serialization/variant.hpp>
-#define MIRAGE_COFU(T, name, ...) \
-	inline struct _##name##cofu { T* instance = nullptr; T& operator()(void) { if(!instance) instance = new T(__VA_ARGS__); \
-	return *instance; }; static bool destructed; ~_##name##cofu(void) { destructed = true; if(instance) delete instance;} \
-	static bool isDestructed(void) { return destructed; } } name; inline bool _##name##cofu::destructed = false
 	
 using namespace boost::placeholders;
 namespace mirage::utils
 {
-	inline std::string sanitize(std::string str, std::function<bool(char)> filter)
-	{
-		return boost::remove_erase_if(str, !boost::bind(filter, _1));
-	}
+	template<typename Func>
+	std::string sanitize(std::string str, Func&& filter);	
 	
-	inline std::string sanitizeUsername(std::string_view str)
-	{
-		return sanitize(std::string{str}, isalnum);
-	}
-/*
- *
- * @example: template<> struct fmt::formatter<MyEnum> : EnumFormatter<MyEnum> {};
- */
-	template<typename T>
-	struct EnumFormatter : fmt::formatter<std::string_view>
-	{
-		template<typename FormatContext>
-		auto format(T en, FormatContext& ctx)
-		{
-			return fmt::formatter<std::string_view>::format(magic_enum::enum_name(en), ctx);
-		}
-	};
+	std::string sanitizeUsername(std::string str);	
 
 	/*
 	 * safe stringView for memarrays.
 	 * returns "" if string invalid, if valid returned 
 	 * string_view size will be equal to strlen(src)
 	 */
-	inline std::string_view stringView(const char* const src, const size_t maxSize)
-	{
-		if(!src)
-			return "";
-		const auto* const zeroPos = 
-			static_cast<const char* const>(memchr(src, '\0', maxSize));
-		if(!zeroPos)
-			return "";
-
-		const auto size = static_cast<size_t>(zeroPos - src);
-
-		if(!size)
-			return "";
-
-		return std::string_view(src, size);
-	}
+	std::string_view stringView(const char* const src, const size_t maxSize);	
 
 	constexpr auto serializationFlags = boost::archive::no_header | boost::archive::no_tracking;
 
-	inline std::string serialize(const auto& value)
-	{
-		std::stringstream ss{};
-		boost::archive::binary_oarchive archive{ss, serializationFlags};
-		
-		archive << value;
-
-		return ss.str();
-	}
+	std::string serialize(const auto& value);	
 
 	template<typename T>
-	inline T deserialize(const std::string& sv)
-	{
-		std::istringstream ss{sv};	
-
-		boost::archive::binary_iarchive archive{ss, serializationFlags};
-		
-		T value;
-
-		archive >> value;
-
-		return value;
-	}
+	T deserialize(const std::string& sv);	
 
 	template<typename T>
 	struct Vec3
@@ -103,12 +44,7 @@ namespace mirage::utils
 			y{},
 			z{};
 
-		inline void serialize(auto& ar, const unsigned)
-		{
-			ar & x;
-			ar & y;
-			ar & z;
-		};
+		void serialize(auto& ar, const unsigned);	
 	};
 }
 template<typename T> 
@@ -119,3 +55,35 @@ struct std::less<std::unique_ptr<T>>
 		return *a < *b;
 	}
 };
+
+inline std::string mirage::utils::serialize(const auto& value)
+{
+	std::stringstream ss{};
+	boost::archive::binary_oarchive archive{ss, serializationFlags};
+	
+	archive << value;
+
+	return ss.str();
+}
+
+template<typename T>
+inline T mirage::utils::deserialize(const std::string& sv)
+{
+	std::istringstream ss{sv};	
+
+	boost::archive::binary_iarchive archive{ss, serializationFlags};
+	
+	T value;
+
+	archive >> value;
+
+	return value;
+}
+
+template<typename T>
+inline void mirage::utils::Vec3<T>::serialize(auto& ar, const unsigned)
+{
+	ar & x;
+	ar & y;
+	ar & z;
+}

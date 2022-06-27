@@ -6,9 +6,9 @@
 #include <type_traits>
 #include <boost/asio/placeholders.hpp>
 #include "packet.h"
+#include "logging.h"
 
-template<> struct fmt::formatter<mirage::network::PacketId> 
-	: mirage::utils::EnumFormatter<mirage::network::PacketId> {};
+MIRAGE_ENUM_FORMATTER(mirage::network::PacketId);
 
 namespace mirage::network
 {

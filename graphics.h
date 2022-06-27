@@ -1,19 +1,18 @@
 #pragma once
-#include <cstdint>
 #include <string>
-#include <boost/uuid/uuid.hpp>
 #include <boost/serialization/version.hpp>
-#include "SDL_surface.h"
-#include "boost/optional/optional.hpp"
-#include "boost/variant/variant.hpp"
-#include "libs/asio/include/boost/asio/buffer.hpp"
-#include "utility.h"
+#include <boost/asio/buffer.hpp>
 #include <entt/entt.hpp>
 #include <SDL.h>
+#include <boost/serialization/array_wrapper.hpp>
+#include "utility.h"
+
 namespace mirage::graphics
 {
-	using Color = SDL_Color;
-	using Icon  = entt::id_type;
+	using Icon = entt::id_type;
+	using Scale = float;
+	using Transform = utils::Vec3<float>;
+	using Filter = boost::variant<Transform, Scale>;
 
 	struct SurfaceWrapper
 	{
@@ -44,10 +43,7 @@ namespace mirage::graphics
 
 		BOOST_SERIALIZATION_SPLIT_MEMBER()
 	};
-	
-	using Transform = utils::Vec3<float>;
-	using Scale 	= float;
-	using Filter 	= boost::variant<Color, Transform, Scale>;
+
 	
 	struct Vertice
 	{

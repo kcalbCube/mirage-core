@@ -1,5 +1,6 @@
 #pragma once
 #include <ctime>
+#include <ratio>
 #include <thread>
 #include <chrono>
 #include "ecs.h"
@@ -7,6 +8,7 @@
 #include "utility.h"
 #include <map>
 #include <boost/core/demangle.hpp>
+#include "mirage.h"
 
 namespace mirage::ecs::processing
 {
@@ -21,43 +23,25 @@ namespace mirage::ecs::processing
 			succeeded
 		} state = State::running;
 		clock_t last = 0;
-		int priority = 0; // less - earlier
+		uint8_t priority = 0; // greater - earlier
 
 		struct Exit {};
 
-		void fail(void)
-		{
-			state = State::failed;
-			throw Exit{};
-		}
+		void fail(void);
 
-		void pause(void)
-		{
-			state = State::paused;
-			throw Exit{};
-		}
+		void pause(void);
 
-		void unpause(void)
-		{
-			state = State::running;
-		}
+		void unpause(void);
 
-		void succeed(void)
-		{
-			state = State::succeeded;
-			throw Exit{};
-		}
-	
-		void terminate(void) noexcept
-		{
-			state = State::terminated;
-		}
+		void succeed(void);
+
+		void terminate(void) noexcept;
 
 		// Not virtual, CRTP.
-		void initialize(void) {}
+		void initialize(void);
 
-		virtual void onFail(void)    {}	
-		virtual void onSucceed(void) {}
+		virtual void onFail(void);
+		virtual void onSucceed(void);
 		virtual void update(float delta) = 0;
 
 		virtual ~Process(void) {}
@@ -67,11 +51,13 @@ namespace mirage::ecs::processing
 
 	class Processor
 	{
-		std::map<entt::id_type, std::unique_ptr<Process>> processes;
-		std::mutex mutex;
+		std::shared_ptr<std::map<entt::id_type, std::unique_ptr<Process>>> processes;
+		std::shared_ptr<std::mutex> mutex;
 
 		entt::id_type i = 0;
 	public:
+
+		Processor(void);
 
 		/*
 		 * @returns descriptor of the attached process
@@ -79,114 +65,55 @@ namespace mirage::ecs::processing
 		template<typename ProcessT, typename... Args>
 		entt::id_type attach(Args&&... args)
 		{
-			std::lock_guard guard{mutex};
+			std::lock_guard guard{*mutex};
 
-			auto& process = *processes.emplace(i, std::make_unique<ProcessT>()).first->second;
-			static_cast<ProcessT&>(process).initialize(args...);
+			auto ptr = std::make_unique<ProcessT>();
+			ptr->initialize(args...);
 
-			return i++;
+			auto index = (ptr->priority << 24) | i++;
+			processes->emplace(index, std::move(ptr));
+
+			return index;
 		}
 
 		// terminate a process, will not stop already updating process, then wait a tick.
-		void terminate(entt::id_type id)
-		{
-			std::lock_guard guard{mutex};
+		void terminate(entt::id_type id);
 
-			if(!processes.contains(id))
-				return;
+		void update(void);
 
-			processes[id]->terminate();
-		}
-
-		void update(void)
-		{
-			if(processes.empty())
-				return;
-
-			std::lock_guard guard{mutex};
-
-			std::erase_if(processes,
-				[&](auto& pair) -> bool
-				{
-					auto& process = pair.second;
-
-					switch(process->state)
-					{
-					case Process::State::running:
-						try
-						{
-							clock_t now = clock();
-							float passed;
-
-							if(now < process->last) // clock_t overflow
-							{
-								if constexpr (sizeof(clock_t) == 4)
-									passed = static_cast<float>(static_cast<uint64_t>(UINT32_MAX) + now) / (CLOCKS_PER_SEC * 1000.f);
-								else
-									passed = now / (CLOCKS_PER_SEC * 1000.f);
-							}
-							else [[likely]]
-								passed = static_cast<float>(now - process->last) / (CLOCKS_PER_SEC * 1000.f);	
-
-							process->update(passed);
-							process->last = now;
-						}
-						catch(Process::Exit) {}
-						catch(std::exception& exception)
-						{
-							process->fail();
-							loge("Exception in process \"{}\": {}, process terminated", // TODO: boost::stacktrace
-								boost::core::demangle(typeid(*process).name()),
-								exception.what());
-						}
-						break;
-
-					case Process::State::succeeded:
-						process->onSucceed();
-						return true;
-
-					case Process::State::failed:
-						process->onFail();
-						return true;
-
-					case Process::State::terminated:
-						return true;
-
-					case Process::State::paused:	
-					default:
-						break;	
-					}
-
-					return false;
-				});
-		}
-
-		virtual void start(void) = 0;
+		//virtual void start(void) = 0;
 		virtual void stop(void) = 0;
 
-		virtual ~Processor(void) {}
-	};
+		virtual ~Processor(void);
+		};
 
 	template<unsigned Milliseconds>
-	class PeriodMS : public Processor
-	{
-		PeriodMS(void)
-		{
-			start();
-		}
-		std::jthread thread;
+	class PeriodMS 
+		: public Component<PeriodMS<Milliseconds>>,
+		  public Processor,
+		  public Singleton<PeriodMS<Milliseconds>>
+	{	
+		std::shared_ptr<std::jthread> thread;
 	public:
 
-		void start(void);	
+		void initialize(void);	
+		void stop(void) { thread->request_stop(); }	
+	};
 
-		void stop(void) { thread.request_stop(); }
 
-		static PeriodMS<Milliseconds>& getInstance(void)
-		{
-			static PeriodMS<Milliseconds> instance;
-			return instance;
-		}
-	};	
+	// Processor, which period depends on tickrate.	
+	template<typename Ratio=std::ratio<1,1>> // C++20 allows float parameter, but just gcc support that.
+	class TickProcessor 
+		: public Component<TickProcessor<Ratio>>,
+		  public Processor,
+		  public Singleton<TickProcessor<Ratio>>
+	{
+		std::shared_ptr<std::jthread> thread;
+	public:
+
+		void initialize(void);
+		void stop(void) { thread->request_stop(); }
+	};
 
 	class EventDispatcherProcessing : public ecs::Component<EventDispatcherProcessing>
 	{
@@ -237,32 +164,10 @@ namespace mirage::ecs
 	};
 }
 
-inline void mirage::ecs::processing::EventDispatcherProcessing::initialize(void)
-{
-	thread = std::jthread([](std::stop_token st) -> void
-	{
-		while(!st.stop_requested() && !event::dispatcher.destructed)
-		{	
-			event::dispatcher().update();	
-			lateQueueUpdate();	
-			std::this_thread::sleep_for(std::chrono::milliseconds(updatePeriod));
-		}
-		stopped.store(true);
-	});
-
-	thread.detach();
-}
-
-inline void mirage::ecs::processing::EventDispatcherProcessing::onDestroy()
-{
-	thread.request_stop();
-	stopped.wait(false);
-}
-
 template<unsigned Milliseconds>
-inline void mirage::ecs::processing::PeriodMS<Milliseconds>::start(void)
+void mirage::ecs::processing::PeriodMS<Milliseconds>::initialize(void)
 {
-	thread = std::jthread([this](std::stop_token itoken) -> void
+	thread = std::make_shared<std::jthread>([this](std::stop_token itoken) -> void
 	{
 		while(!itoken.stop_requested())
 		{
@@ -273,5 +178,22 @@ inline void mirage::ecs::processing::PeriodMS<Milliseconds>::start(void)
 		};
 	});
 
-	thread.detach();
+	thread->detach();
+}
+
+template<typename Ratio>
+void mirage::ecs::processing::TickProcessor<Ratio>::initialize(void)
+{
+	thread = std::make_shared<std::jthread>([this](std::stop_token itoken) -> void
+	{
+		while(!itoken.stop_requested())
+		{
+			auto start = std::chrono::high_resolution_clock::now();
+			update();
+			std::this_thread::sleep_until(start +
+				std::chrono::milliseconds(static_cast<long>(tickrate().getPeriod() * static_cast<double>(Ratio::den))));
+		};
+	});
+
+	thread->detach();
 }

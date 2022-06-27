@@ -6,12 +6,13 @@
 #include <deque>
 #include <boost/function.hpp>
 #include <typelist.hpp>
+#include <boost/bind.hpp>
 
 namespace mirage::ecs
 {
-	MIRAGE_COFU(entt::registry, registry);
-	MIRAGE_COFU(std::mutex, lateQueueLock);
-	MIRAGE_COFU(std::deque<boost::function<void(void)>>, lateQueue);	
+	MIRAGE_COFU_H(entt::registry, registry);
+	MIRAGE_COFU_H(std::mutex, lateQueueLock);
+	MIRAGE_COFU_H(std::deque<boost::function<void(void)>>, lateQueue);
 
 	template<typename T>
 	class ComponentWrapper;
@@ -26,19 +27,18 @@ namespace mirage::ecs
 	public:
 		using inherits = tl::type_list<>;
 
-		void initialize(void) {}
 		static std::once_flag onceFlag;
 
 		bool initialized = false;
 
-		entt::entity entity{};
+		entt::entity entity;
 
 		virtual ~Component(void);
 
 		/*
 		 * called once before first creation
  	 	 */
-		static void staticInitialize(void) {}
+		static void staticInitialize(void);
 
 		/*
 		 * called per creation
@@ -54,7 +54,7 @@ namespace mirage::ecs
 		 */
 		std::nullptr_t lateInitialize(void);
 
-		void onDestroy(void) {}
+		void onDestroy(void);
 
 		void destroy(void);
 
@@ -115,7 +115,7 @@ namespace mirage::ecs
 	template<typename T>
 	struct Singleton
 	{
-		// Creates instance on first call. Can cause late-initialization 
+		// Creates instance on first call. 
 		static T& getInstance(void);
 
 		struct Lockable
@@ -248,7 +248,7 @@ template<typename T>
 inline T& mirage::ecs::ComponentWrapper<T>::get(void)
 {
 	if(!isValid())
-		throw std::runtime_error("attempt of dereference invalid ComponenWrapper<T> via get()");
+		throw std::runtime_error("attempt of dereference invalid ComponentWrapper<T> via get()");
 	return registry().get<T>(entity);
 }
 template<typename T>
@@ -276,8 +276,6 @@ inline bool mirage::ecs::ComponentWrapper<T>::isValid(void) const
 {
 	return registry().valid(entity);
 }
-template<typename T>
-inline std::once_flag mirage::ecs::Component<T>::onceFlag;
 
 template<typename T>
 inline entt::entity mirage::ecs::createUnitialized(void)
@@ -300,7 +298,7 @@ inline void mirage::ecs::initialize(const entt::entity& entity, Args&&... args)
 		 * glory to optimizator
 		 * TODO: rewrite to own system.
 		 */
-		T::inherits::for_each([&](auto t) -> void
+		T::inherits::for_each([&](auto t) -> void // maybe rvalue?
 		{
 			using CT = typename decltype(t)::type;
 			enheir<CT>(entity);
@@ -339,66 +337,40 @@ inline void mirage::ecs::enheir(const entt::entity& entity, Args&&... args)
 }
 
 template<typename T>
-inline void mirage::ecs::destroy(const entt::entity& entity)
-{
-	registry().destroy(entity);
-}
-
-template<typename T>
-inline mirage::ecs::Component<T>::~Component(void)
+inline mirage::ecs::Component<T>::Component::~Component(void)
 {
 	onDestroy();
 	event::dispatcher().disconnect(this);
 }
 
 template<typename T>
-inline void mirage::ecs::Component<T>::destroy(void)
-{
-	if(!registry().valid(entity))
-		return;
-	mirage::ecs::destroy<T>(entity);
-}
-
-inline void mirage::ecs::lateQueueUpdate(void)
-{
-	if(lateQueue().empty())
-		return;
-
-	std::lock_guard lock(lateQueueLock());
-	for(auto&& f : lateQueue())
-		f();
-	lateQueue().clear();
-
-}
-
-template<typename T>
-mirage::ecs::Component<T>::operator entt::entity&(void)
+inline mirage::ecs::Component<T>::operator entt::entity&(void)
 {
 	return entity;
 }
 
 template<typename T>
-mirage::ecs::Component<T>::operator const entt::entity&(void) const
+inline mirage::ecs::Component<T>::operator const entt::entity&(void) const
 {
 	return entity;
 }
 
 template<typename T>
-void mirage::ecs::Component<T>::callLate(const boost::function<void(void)>& function)
+inline void mirage::ecs::Component<T>::callLate(const boost::function<void(void)>& function)
 {
 	std::lock_guard lock(lateQueueLock());
 	lateQueue().push_back(std::move(function));
 }
 
 template<typename T>
-void mirage::ecs::Component<T>::callLate(void (T::*func)(void))
+inline void mirage::ecs::Component<T>::callLate(void (T::*func)(void))
 {
 	std::lock_guard lock(lateQueueLock());
 	lateQueue().push_back(boost::bind(func, static_cast<T*>(this)));
 }
 
 template<typename T>
-T& mirage::ecs::Singleton<T>::getInstance(void)
+inline T& mirage::ecs::Singleton<T>::getInstance(void)
 {
 	static ComponentWrapper<T> cw;
 	if(!cw.isValid())
@@ -408,4 +380,27 @@ T& mirage::ecs::Singleton<T>::getInstance(void)
 }
 
 template<typename T>
+inline std::once_flag mirage::ecs::Component<T>::onceFlag;
+
+template<typename T>
+inline void mirage::ecs::Component<T>::onDestroy(void) {}
+
+template<typename T>
+inline void mirage::ecs::Component<T>::staticInitialize(void) {}
+
+template<typename T>
 inline std::mutex mirage::ecs::Singleton<T>::Lockable::mutex;
+
+template<typename T>
+inline void mirage::ecs::Component<T>::destroy(void)
+{
+	if(!registry().valid(entity))
+		return;
+	mirage::ecs::destroy<T>(entity);
+}
+
+template<typename T>
+inline void mirage::ecs::destroy(const entt::entity& entity)
+{
+	registry().destroy(entity);
+}

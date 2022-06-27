@@ -1,6 +1,6 @@
 #pragma once
 #include <entt/entt.hpp>
-#include "utility.h"
+#include "static.h"
 #include <mutex>
 #include <cstdio>
 
@@ -24,19 +24,18 @@
 
 namespace mirage::event
 {
-	MIRAGE_COFU(entt::dispatcher, dispatcher);	
-	MIRAGE_COFU(std::mutex, lock);
+	MIRAGE_COFU_H(entt::dispatcher, dispatcher);	
+	MIRAGE_COFU_H(std::mutex, lock);
 
 	template<typename T, typename... Args>
-	inline void enqueueEvent(Args... args)
+	void enqueueEvent(Args... args)
 	{	
-		dispatcher().enqueue<T>(args...);	
+		dispatcher().enqueue<T>(std::move(args)...);	
 	}
 
 	template<typename T, typename... Args>
-	inline void triggerEvent(Args&&... args)
+	void triggerEvent(Args... args)
 	{	
-		dispatcher().trigger(T{args...});
+		dispatcher().trigger(T{std::move(args)...});
 	}
 }
-

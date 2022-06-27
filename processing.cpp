@@ -83,7 +83,7 @@ void mirage::ecs::processing::Processor::update(void)
 						catch (Process::Exit) {} 
 						catch (std::exception &exception) 
 						{
-							process->fail();
+							process->terminate();
 							loge("Exception in process \"{}\": {}, process "
 								"terminated", // TODO: boost::stacktrace
 								boost::core::demangle(typeid(*process).name()),

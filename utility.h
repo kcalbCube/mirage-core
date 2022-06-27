@@ -27,7 +27,10 @@ namespace mirage::utils
 	 * returns "" if string invalid, if valid returned 
 	 * string_view size will be equal to strlen(src)
 	 */
-	std::string_view stringView(const char* const src, const size_t maxSize);	
+	std::string_view stringView(const char* const src, const size_t maxSize);
+
+	template<typename Array>
+	std::string_view stringView(Array& array);
 
 	constexpr auto serializationFlags = boost::archive::no_header | boost::archive::no_tracking;
 
@@ -47,6 +50,13 @@ namespace mirage::utils
 		void serialize(auto& ar, const unsigned);	
 	};
 }
+
+template<typename Array>
+std::string_view mirage::utils::stringView(Array& array)
+{
+	return stringView(array, std::size(array));
+}
+
 template<typename T> 
 struct std::less<std::unique_ptr<T>> 
 {

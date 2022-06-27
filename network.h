@@ -27,15 +27,8 @@ namespace mirage::network
 		return T{address, port};
 	}
 
-	inline auto fromStringUdp(const std::string& sv, unsigned short port)
-	{
-		return fromString<boost::asio::ip::udp::endpoint>(sv, port);
-	}
-
-	inline auto fromStringTcp(const std::string& sv, unsigned short port)
-	{
-		return fromString<boost::asio::ip::tcp::endpoint>(sv, port);
-	}
+	auto fromStringUdp(const std::string& sv, unsigned short port);	
+	auto fromStringTcp(const std::string& sv, unsigned short port);	
 
 	// a view to a packet
 	struct AbstractPacket
@@ -71,37 +64,4 @@ namespace mirage::network
 	}
 }
 
-inline mirage::network::AbstractPacket::AbstractPacket(
-		const mirage::network::AbstractPacket& other)
-{
-	(*this) = other;
-}
 
-inline mirage::network::AbstractPacket::AbstractPacket(
-		mirage::network::AbstractPacket&& other) noexcept
-{
-	(*this) = other;
-}
-
-inline mirage::network::AbstractPacket::operator boost::asio::const_buffer(void) const
-{
-	return boost::asio::const_buffer(packet, size);
-}
-
-inline mirage::network::AbstractPacket& 
-	mirage::network::AbstractPacket::operator=(const AbstractPacket& other)
-{
-	if(this == &other)
-		return *this;
-	packet = other.packet;
-	size = other.size;
-	return *this;
-}
-
-inline mirage::network::AbstractPacket& 
-	mirage::network::AbstractPacket::operator=(AbstractPacket&& other) noexcept
-{
-	packet = std::move(other.packet);
-	size = other.size;
-	return *this;
-}

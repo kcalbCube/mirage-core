@@ -32,6 +32,9 @@ namespace mirage::utils
 	template<typename Array>
 	std::string_view stringView(Array& array);
 
+	template<typename Array>
+	std::string_view span(Array& array);
+
 	constexpr auto serializationFlags = boost::archive::no_header | boost::archive::no_tracking;
 
 	std::string serialize(const auto& value);	
@@ -55,6 +58,12 @@ template<typename Array>
 std::string_view mirage::utils::stringView(Array& array)
 {
 	return stringView(array, std::size(array));
+}
+
+template<typename Array>
+std::string_view mirage::utils::span(Array& array)
+{
+	return std::string_view(array, std::size(array));
 }
 
 template<typename T> 

@@ -100,7 +100,7 @@ namespace mirage::network
 	struct GraphicFrame : Packet<PacketId::graphicFrame>
 	{
 		using SerializedT = std::vector<graphics::VerticeGroup>;
-		char serialized[256];	
+		char serialized[8192];	
 	};
 
 	struct ResourceUpdate : Packet<PacketId::resource>

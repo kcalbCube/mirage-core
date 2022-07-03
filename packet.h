@@ -6,7 +6,7 @@
 namespace mirage::network
 {
 	constexpr uint32_t packetConstant = 0x4752494D;
-	constexpr size_t maxPacketSize = 1024;
+	constexpr size_t maxPacketSize = 10240;
 	constexpr size_t maxTcpPacketSize = 307'200;
 	constexpr size_t usernameMax = 32;
 

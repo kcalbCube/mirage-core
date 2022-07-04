@@ -10,8 +10,8 @@
 namespace mirage::graphics
 {
 	using Icon = entt::id_type;
-	using Scale = std::pair<float, float>;
-	using Transform = utils::Vec3<float>;
+	using Scale = std::pair<uint8_t, uint8_t>;
+	using Transform = utils::Vec3<uint8_t>;
 	using Filter = boost::variant<Transform, Scale>;
 
 	struct SurfaceWrapper
@@ -53,7 +53,7 @@ namespace mirage::graphics
 			transparent = 2, // bypasses clicks
 		};
 
-		uint16_t // (0..1) * UINT16_MAX
+		uint16_t // pixels
 			x = 0,
 			y = 0;
 

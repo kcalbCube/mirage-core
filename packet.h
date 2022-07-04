@@ -2,6 +2,7 @@
 #include <string>
 #include "graphics.h"
 #include <boost/asio/ip/udp.hpp>
+#include "client.h"
 
 namespace mirage::network
 {
@@ -44,7 +45,12 @@ namespace mirage::network
 		/*
 		 * c->s Input
 		 */
-		input
+		input,
+		/*
+		 * c->s ClientInformationUpdate
+		 * s->c ClientInformationRequest
+		 */
+		clientInfo
 	};
 
 #pragma pack(push, 1)
@@ -119,6 +125,16 @@ namespace mirage::network
 	{
 		using SerializedT = std::set<SDL_Scancode>;
 		char serialized[256];
+	};
+
+	struct ClientInformationUpdate : Packet<PacketId::clientInfo>
+	{
+		using SerializedT = mirage::ClientInformation;
+		char serialized[256];
+	};
+
+	struct ClientInformationRequest : Packet<PacketId::clientInfo>
+	{
 	};
 
 #pragma pack(pop)

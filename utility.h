@@ -13,7 +13,8 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/optional.hpp>
 #include <boost/serialization/variant.hpp>
-	
+#include <boost/serialization/utility.hpp>	
+
 using namespace boost::placeholders;
 namespace mirage::utils
 {

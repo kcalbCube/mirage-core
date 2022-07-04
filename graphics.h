@@ -10,7 +10,7 @@
 namespace mirage::graphics
 {
 	using Icon = entt::id_type;
-	using Scale = float;
+	using Scale = std::pair<float, float>;
 	using Transform = utils::Vec3<float>;
 	using Filter = boost::variant<Transform, Scale>;
 

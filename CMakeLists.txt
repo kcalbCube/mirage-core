@@ -1,16 +1,12 @@
 cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
 
-project(SDLImageStub C)
-file(GLOB SDL_IMAGE_SOURCES "${CMAKE_SOURCE_DIR}/include/SDL_image/IMG*.c")
-
-add_library(SDLImageStub ${SDL_IMAGE_SOURCES})
-target_include_directories(SDLImageStub PUBLIC "${CMAKE_SOURCE_DIR}/include/SDL/include")
-
 project(MirageCore CXX)
 set(PROJECT_NAME mirage-core)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS "*.h" "*.cpp")
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
+
+set(SDL2_FOUND ON CACHE BOOL "")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,4 +35,4 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 	-fno-strict-aliasing
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC boost_serialization fmt-header-only fmtlog-static SDLImageStub)
+target_link_libraries(${PROJECT_NAME} PUBLIC boost_serialization fmt-header-only fmtlog-static SDL2_image)

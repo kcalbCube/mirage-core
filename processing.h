@@ -115,7 +115,8 @@ namespace mirage::ecs::processing
 		void stop(void) { thread->request_stop(); }
 	};
 
-	class EventDispatcherProcessing : public ecs::Component<EventDispatcherProcessing>
+	class EventDispatcherProcessing : 
+		public ecs::Component<EventDispatcherProcessing>	
 	{
 		std::jthread thread;
 		static std::atomic_bool stopped;
@@ -125,9 +126,8 @@ namespace mirage::ecs::processing
 
 		void onDestroy(void);
 	};
-
-	inline std::atomic_bool EventDispatcherProcessing::stopped{false};
-	MIRAGE_CREATE_ON_STARTUP(EventDispatcherProcessing, eventProcessing);
+	
+	MIRAGE_CREATE_ON_STARTUP(EventDispatcherProcessing, eventProcessing);	
 }
 
 namespace mirage::ecs

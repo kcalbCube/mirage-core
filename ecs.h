@@ -8,6 +8,13 @@
 #include <typelist.hpp>
 #include <boost/bind.hpp>
 
+//#define COMPONENT_INITIALIZATION_LOG
+
+#ifdef COMPONENT_INITIALIZATION_LOG
+#include "logging.h"
+#include <boost/core/demangle.hpp>
+#endif
+
 namespace mirage::ecs
 {
 	MIRAGE_COFU_H(entt::registry, registry);
@@ -63,11 +70,12 @@ namespace mirage::ecs
 		void callLate(const boost::function<void(void)>& function);
 
 		/*
-		 * cannot be called in event handler 
+		 * cannot be called in event handler
 		 */
 		template<typename Event, void (T::*Func)(Event&)>
 		void bindEvent(void)
-		{	
+		{
+			std::lock_guard guard{event::lock()};
 			event::dispatcher().sink<Event>()
 				.template connect<Func>(static_cast<T*>(this));	
 		}
@@ -292,6 +300,9 @@ inline void mirage::ecs::initialize(const entt::entity& entity, Args&&... args)
 {
 	if(auto* entityptr = registry().try_get<T>(entity))
 	{
+#ifdef COMPONENT_INITIALIZATION_LOG
+		logi("Component<{}> initialized", boost::core::demangle(typeid(T).name()));
+#endif
 		std::call_once(T::onceFlag, T::staticInitialize);
 		/*
 		 * type list's for_each creates type and passes it,

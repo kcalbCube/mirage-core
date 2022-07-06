@@ -10,17 +10,19 @@
 
 #define MIRAGE_CREATE_WITH_EVENT(_event_, _T_) \
 	namespace __static__##_T_##_event_{ \
-	MIRAGE_ON_STARTUP(createWithEvent, ( \
+	MIRAGE_ON_STARTUP(createWithEvent, ([](void)->void { \
+	std::lock_guard lock{::mirage::event::lock()}; \
 	::mirage::event::dispatcher().sink<_event_>() \
-	.connect<&::mirage::ecs::_createStubArg<_T_, _event_>>()))};
+	.connect<&::mirage::ecs::_createStubArg<_T_, _event_>>();}()))};
 /*
  * on event _event_ create component _T_.
  */
 #define MIRAGE_CREATE_ON_EVENT(_event_, _T_) \
 	namespace __static__##_T_##_event_{ \
-	MIRAGE_ON_STARTUP(createOnEvent, ( \
+	MIRAGE_ON_STARTUP(createOnEvent, ([](void)->void {\
+	std::lock_guard lock{::mirage::event::lock()}; \
 	::mirage::event::dispatcher().sink<_event_>() \
-	.connect<&::mirage::ecs::_createStub<_T_>>()))};
+	.connect<&::mirage::ecs::_createStub<_T_>>();}()))};
 
 namespace mirage::event
 {

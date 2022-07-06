@@ -1,5 +1,10 @@
 #include "processing.h"
 
+namespace mirage::ecs::processing
+{
+	std::atomic_bool EventDispatcherProcessing::stopped{false};	
+};
+
 mirage::ecs::processing::Processor::Processor(void)
 {
 	mutex = std::make_shared<std::mutex>();
@@ -115,14 +120,19 @@ mirage::ecs::processing::Processor::~Processor(void) {}
 
 void mirage::ecs::processing::EventDispatcherProcessing::initialize(void)
 {
+
 	thread = std::jthread([](std::stop_token st) -> void
 	{
-		while(!st.stop_requested() && !event::dispatcher.destructed)
-		{	
-			event::dispatcher().update();	
+		do 
+		{
+			{
+				std::lock_guard guard{event::lock()};
+				event::dispatcher().update();	
+			}
 			lateQueueUpdate();	
 			std::this_thread::sleep_for(std::chrono::milliseconds(updatePeriod));
-		}
+		} while(!st.stop_requested() && !event::dispatcher.destructed);
+
 		stopped.store(true);
 	});
 
